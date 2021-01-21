@@ -11,7 +11,7 @@
 #include<unistd.h>
 
 #define L 4 //numero de threads leitoras
-#define E 2 //numero de threads escritoras
+#define E 4 //numero de threads escritoras
 #define N 10 //tamanho do vetor
 
 //variaveis do problema
