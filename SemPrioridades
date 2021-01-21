@@ -1,0 +1,159 @@
+/* Disciplina: Computacao Concorrente */
+/* Prof.: Silvana Rossetto */
+/* Descricao: implementa  o problema dos leitores/escritores usando variaveis de condicao da biblioteca Pthread
+ * 
+ * Aluno: Arthur Guilherme Souza
+ */
+
+#include<pthread.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+
+#define L 4 //numero de threads leitoras
+#define E 2 //numero de threads escritoras
+#define N 10 //tamanho do vetor
+
+//variaveis do problema
+int leit = 0; //contador de threads lendo
+int escr = 0; //contador de threads escrevendo
+int vetor[N]; // vetorde valores inteiros
+
+//variaveis para sincronizacao
+pthread_mutex_t mutex;
+pthread_cond_t cond_leit, cond_escr;
+
+//entrada leitura
+void InicLeit(int id) {
+	pthread_mutex_lock(&mutex);
+	printf("L[%d] quer ler\n", id);
+	while (escr > 0) {
+		printf("L[%d] bloqueou\n", id);
+		pthread_cond_wait(&cond_leit, &mutex);
+		printf("L[%d] desbloqueou\n", id);
+	}
+	leit++;
+	pthread_mutex_unlock(&mutex);
+}
+
+//saida leitura
+void FimLeit(int id) {
+	pthread_mutex_lock(&mutex);
+	printf("L[%d] terminou de ler\n", id);
+	leit--;
+	if (leit == 0)
+		pthread_cond_signal(&cond_escr);
+	pthread_mutex_unlock(&mutex);
+}
+
+//entrada escrita
+void InicEscr(int id) {
+	pthread_mutex_lock(&mutex);
+	printf("E[%d] quer escrever\n", id);
+	while ((leit > 0) || (escr > 0)) {
+		printf("E[%d] bloqueou\n", id);
+		pthread_cond_wait(&cond_escr, &mutex);
+		printf("E[%d] desbloqueou\n", id);
+	}
+	escr++;
+	pthread_mutex_unlock(&mutex);
+}
+
+//saida escrita
+void FimEscr(int id) {
+	pthread_mutex_lock(&mutex);
+	printf("E[%d] terminou de escrever\n", id);
+	escr--;
+	pthread_cond_signal(&cond_escr);
+	pthread_cond_broadcast(&cond_leit);
+	pthread_mutex_unlock(&mutex);
+}
+
+//thread leitora
+void* leitor(void *arg) {
+	int *id = (int*) arg;
+	while (1) {
+		InicLeit(*id);
+	//
+		// Inicio da leitura
+	//
+		printf("Leitora %d esta lendo\n", *id);
+
+		int media = vetor[0];
+
+		// impressao do vetor
+		printf("[ %d",vetor[0]);
+		for(int i =0; i<N; i++){
+			printf(", %d",vetor[i]);
+			media+=vetor[i];
+		}
+		printf(" ]\n");
+
+		// impressao da media dos valores do vetor
+		printf("media dos valores do vetor = %d\n", media);
+	//
+		// Fim da leitura
+	//
+		FimLeit(*id);
+		sleep(1);
+	}
+	free(arg);
+	pthread_exit(NULL);
+}
+
+//thread escritora
+void* escritor(void *arg) {
+	int *id = (int*) arg;
+	while (1) {
+		InicEscr(*id);
+	//
+		// Inicio da escrita
+	//
+		printf("Escritora %d esta escrevendo\n", *id);
+		vetor[0]=*id;
+		vetor[N-1]=*id;
+		for(int i = 1; i < (N-1); i++)
+			vetor[i] = (*id)*2;
+	//
+		// Fim da escrita
+	//
+		FimEscr(*id);
+		sleep(1);
+	}
+	free(arg);
+	pthread_exit(NULL);
+}
+
+//funcao principal
+int main(void) {
+
+	// popula vetor
+	for(int i =0; i<N; i++)
+		vetor[i]=0;
+
+	//identificadores das threads
+	pthread_t tid[L + E];
+	int id[L + E];
+
+	//inicializa as variaveis de sincronizacao
+	pthread_mutex_init(&mutex, NULL);
+	pthread_cond_init(&cond_leit, NULL);
+	pthread_cond_init(&cond_escr, NULL);
+
+	//cria as threads leitoras
+	for (int i = 0; i < L; i++) {
+		id[i] = i + 1;
+		if (pthread_create(&tid[i], NULL, leitor, (void*) &id[i]))
+			exit(-1);
+	}
+
+	//cria as threads escritoras
+	for (int i = 0; i < E; i++) {
+		id[i + L] = i + 1;
+		if (pthread_create(&tid[i + L], NULL, escritor, (void*) &id[i + L]))
+			exit(-1);
+	}
+
+	pthread_exit(NULL);
+	return 0;
+}
